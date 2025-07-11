@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sopa de Letras de Continuidad de Negocio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Kalam:wght@700&display=swap" rel="stylesheet">
+    <style>
+        /* FIX: Updated color palette to an indigo/purple theme */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f5f3ff; /* Light purple background */
+        }
+        .title-font {
+            font-family: 'Kalam', cursive;
+        }
+        .word-search-grid {
+            display: grid;
+            grid-template-columns: repeat(15, minmax(0, 1fr));
+            gap: 4px;
+            user-select: none;
+            max-width: 500px;
+            margin: auto;
+        }
+        .grid-cell {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1rem;
+            font-weight: 600;
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .grid-cell.selecting {
+            background-color: #a78bfa; /* Violet */
+            color: white;
+        }
+        .grid-cell.found {
+            background-color: #2dd4bf; /* Teal */
+            color: white;
+        }
+        .word-list-item.found {
+            text-decoration: line-through;
+            color: #9ca3af;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-gray-200">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-indigo-800 title-font">Sopa de Letras</h1>
+            <p class="text-gray-600 mt-2">Encuentra las palabras ocultas basándote en las pistas.</p>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- Columna de la Sopa de Letras -->
+            <div class="w-full lg:w-2/3 flex justify-center items-center">
+                <div id="word-search-container" class="word-search-grid">
+                    <!-- Las celdas se generarán con JavaScript -->
+                </div>
+            </div>
+
+            <!-- Columna de Pistas -->
+            <div class="w-full lg:w-1/3">
+                <div class="bg-indigo-50 p-6 rounded-lg h-full">
+                    <h2 class="text-2xl font-bold text-indigo-700 mb-4">Pistas:</h2>
+                    <ul id="word-list" class="space-y-3 text-gray-700 text-base">
+                        <!-- La lista de pistas se generará aquí -->
+                    </ul>
+                     <div class="text-center mt-6">
+                        <button id="reset-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                            Reiniciar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const wordsWithClues = [
+            { word: 'BRS', clue: '1. Soy el marco completo que engloba todas las estrategias y planes para que la organización entera, no solo la tecnología, pueda volver a la normalidad después de una crisis.' },
+            { word: 'RPO', clue: '2. Mido la cantidad máxima de datos que una empresa puede permitirse perder. Si mi valor es de 1 hora, significa que el último respaldo debe tener, como máximo, esa antigüedad.' },
+            { word: 'BIA', clue: '3. Soy el estudio que se realiza para entender qué partes de la organización son más críticas y cuáles serían las consecuencias si fallaran. Ayudo a establecer prioridades.' },
+            { word: 'FINANCIERO', clue: '4. Me refiero a las consecuencias monetarias directas de un incidente, como la pérdida de ingresos, la aplicación de multas o costos inesperados.' },
+            { word: 'REPUTACIONAL', clue: '5. Este tipo de daño no se mide en billetes, sino en la pérdida de confianza de los clientes y en la percepción negativa del público.' },
+            { word: 'TMIT', clue: '6. Represento el límite de tiempo absoluto que un servicio puede estar inactivo antes de que las consecuencias para el negocio se vuelvan inaceptables. Soy el verdadero punto de no retorno.' },
+            { word: 'CFS', clue: '7. Soy lo que el usuario utiliza directamente. Ejemplos de mí es la aplicación móvil del banco.' },
+            { word: 'RFS', clue: '8. Aunque el cliente no me ve, soy esencial para que los servicios que él usa funcionen. Soy el "detrás de cámaras".' },
+            { word: 'TES', clue: '9. Soy la base sobre la que todo lo demás se construye. Incluyo elementos como la red, los servidores físicos o la electricidad del centro de datos. Sin mí, nada funciona.' },
+            { word: 'DRP', clue: '10. Soy el documento que contiene las instrucciones detalladas para restaurar la infraestructura tecnológica después de un evento catastrófico, como un incendio o una inundación.' },
+            { word: 'RTO', clue: '11. Soy la meta de tiempo establecida para restaurar un servicio después de una falla. Respondo a la pregunta: ¿En cuánto tiempo debemos tener esto funcionando de nuevo?' },
+            { word: 'LEGAL', clue: '12. Este tipo de impacto se produce cuando un incidente provoca que la empresa no cumpla con leyes, normativas o contratos, lo que puede acarrear sanciones.' }
+        ];
+        const wordsToFind = wordsWithClues.map(item => item.word);
+        const gridSize = 15;
+        const alphabet = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ';
+
+        const gridContainer = document.getElementById('word-search-container');
+        const wordListContainer = document.getElementById('word-list');
+        const resetButton = document.getElementById('reset-button');
+
+        let grid = [];
+        let isSelecting = false;
+        let selection = [];
+        let foundWords = [];
+
+        function init() {
+            gridContainer.innerHTML = '';
+            wordListContainer.innerHTML = '';
+            foundWords = [];
+            
+            wordsWithClues.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item.clue;
+                li.id = `word-${item.word}`;
+                li.className = 'word-list-item';
+                wordListContainer.appendChild(li);
+            });
+
+            grid = Array(gridSize).fill(null).map(() => Array(gridSize).fill(null));
+            placeWords();
+            fillEmptySpaces();
+            renderGrid();
+        }
+
+        function placeWords() {
+            const directions = [
+                { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 1, y: -1 },
+                { x: -1, y: 0 }, { x: 0, y: -1 }, { x: -1, y: -1}, { x: -1, y: 1 }
+            ];
+
+            wordsToFind.forEach(word => {
+                let placed = false;
+                let attempts = 0;
+                while (!placed && attempts < 100) {
+                    const dir = directions[Math.floor(Math.random() * directions.length)];
+                    const startRow = Math.floor(Math.random() * gridSize);
+                    const startCol = Math.floor(Math.random() * gridSize);
+
+                    if (canPlaceWord(word, startRow, startCol, dir)) {
+                        for (let i = 0; i < word.length; i++) {
+                            grid[startRow + i * dir.y][startCol + i * dir.x] = word[i];
+                        }
+                        placed = true;
+                    }
+                    attempts++;
+                }
+            });
+        }
+
+        function canPlaceWord(word, row, col, dir) {
+            for (let i = 0; i < word.length; i++) {
+                const newRow = row + i * dir.y;
+                const newCol = col + i * dir.x;
+                if (newRow < 0 || newRow >= gridSize || newCol < 0 || newCol >= gridSize) return false;
+                const existingChar = grid[newRow][newCol];
+                if (existingChar !== null && existingChar !== word[i]) return false;
+            }
+            return true;
+        }
+
+        function fillEmptySpaces() {
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (grid[r][c] === null) {
+                        grid[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
+                    }
+                }
+            }
+        }
+
+        function renderGrid() {
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.textContent = grid[r][c];
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    gridContainer.appendChild(cell);
+                }
+            }
+        }
+        
+        gridContainer.addEventListener('mousedown', e => {
+            if (e.target.classList.contains('grid-cell')) {
+                isSelecting = true;
+                selection = [e.target];
+                e.target.classList.add('selecting');
+            }
+        });
+
+        gridContainer.addEventListener('mouseover', e => {
+            if (isSelecting && e.target.classList.contains('grid-cell')) {
+                document.querySelectorAll('.selecting').forEach(el => el.classList.remove('selecting'));
+                const startCell = selection[0];
+                const endCell = e.target;
+                const startRow = parseInt(startCell.dataset.row);
+                const startCol = parseInt(startCell.dataset.col);
+                const endRow = parseInt(endCell.dataset.row);
+                const endCol = parseInt(endCell.dataset.col);
+                selection = getCellsBetween(startRow, startCol, endRow, endCol);
+                selection.forEach(cell => cell.classList.add('selecting'));
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isSelecting) {
+                isSelecting = false;
+                checkSelection();
+                document.querySelectorAll('.selecting').forEach(el => el.classList.remove('selecting'));
+            }
+        });
+
+        function getCellsBetween(startRow, startCol, endRow, endCol) {
+            const cells = [];
+            const dx = Math.sign(endCol - startCol);
+            const dy = Math.sign(endRow - startRow);
+            if (startRow !== endRow && startCol !== endCol && Math.abs(endRow - startRow) !== Math.abs(endCol - startCol)) {
+                return [selection[0]];
+            }
+            let r = startRow;
+            let c = startCol;
+            while (true) {
+                const cell = document.querySelector(`[data-row='${r}'][data-col='${c}']`);
+                if(cell) cells.push(cell);
+                if (r === endRow && c === endCol) break;
+                r += dy;
+                c += dx;
+            }
+            return cells;
+        }
+
+        function checkSelection() {
+            let selectedString = selection.map(cell => cell.textContent).join('');
+            let reversedString = selectedString.split('').reverse().join('');
+            const foundWord = wordsToFind.find(word => (word === selectedString || word === reversedString) && !foundWords.includes(word));
+            
+            if (foundWord) {
+                foundWords.push(foundWord);
+                selection.forEach(cell => {
+                    cell.classList.add('found');
+                });
+                document.getElementById(`word-${foundWord}`).classList.add('found');
+            }
+            
+            if (foundWords.length === wordsToFind.length) {
+                const modal = document.createElement('div');
+                modal.style.position = 'fixed';
+                modal.style.top = '50%';
+                modal.style.left = '50%';
+                modal.style.transform = 'translate(-50%, -50%)';
+                modal.style.padding = '2rem';
+                modal.style.backgroundColor = 'white';
+                modal.style.border = '2px solid #4f46e5'; /* Indigo border */
+                modal.style.borderRadius = '10px';
+                modal.style.boxShadow = '0 10px 25px rgba(0,0,0,0.2)';
+                modal.style.zIndex = '1000';
+                modal.innerHTML = `
+                    <h3 class="text-2xl font-bold text-indigo-600 mb-4">¡Felicidades!</h3>
+                    <p class="text-lg text-gray-700">Has encontrado todas las palabras.</p>
+                    <button onclick="this.parentElement.remove()" class="mt-4 bg-indigo-500 text-white py-2 px-4 rounded">Cerrar</button>
+                `;
+                document.body.appendChild(modal);
+            }
+        }
+        
+        resetButton.addEventListener('click', init);
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
